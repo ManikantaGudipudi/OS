@@ -65,7 +65,7 @@ The goal of this machine problem was to implement a contiguous frame pool manage
     
     \item \textbf{Internal vs External Management:} The frame pool can store its management information either internally (using the first frame of the pool) or externally (using frames from another pool, like the kernel pool for the process pool).
     
-    \item \textbf{Static Pool Tracking:} Used a static array to track all frame pools, enabling the static \texttt{release\_frames} function to identify which pool owns a given frame.
+    \item \textbf{Static Pool Tracking:} Used a static array with a configurable maximum size (\texttt{Max\_pools = 2}) to track all frame pools, enabling the static \texttt{release\_frames} function to identify which pool owns a given frame. This design supports the typical use case of having one kernel pool and one process pool.
     
     \item \textbf{First-Fit Allocation:} Implemented a first-fit algorithm to find contiguous sequences of free frames, ensuring efficient memory utilization.
 \end{itemize}
@@ -92,8 +92,9 @@ private:
     unsigned long   info_frame_no; // Frame number for management info (0 = internal)
     
     // Static list to track all frame pools for release_frames
-    static ContFramePool* frame_pools[];
-    static unsigned int num_pools;
+    static const unsigned int Max_pools = 2;  // Maximum number of frame pools (kernel + process)
+    static ContFramePool* frame_pools[];      // Array of frame pool pointers
+    static unsigned int num_pools;            // Current number of active pools
 \end{lstlisting}
 
 \paragraph{cont\_frame\_pool.C: Constructor} The constructor initializes the frame pool and sets up the bitmap:
@@ -127,7 +128,7 @@ ContFramePool::ContFramePool(unsigned long _base_frame_no,
     }
     
     // Add this pool to the static list
-    if (num_pools < 10) {
+    if (num_pools < Max_pools) {
         frame_pools[num_pools] = this;
         num_pools++;
     }
@@ -329,6 +330,7 @@ To prevent accidental release of inaccessible memory blocks, the implementation 
     \item \textbf{Safe mark\_inaccessible:} The \texttt{mark\_inaccessible} function now marks frames as \texttt{Reserved} instead of \texttt{Used}, preventing accidental release
     \item \textbf{Protected Release:} The \texttt{release\_frames} function stops when it encounters a \texttt{Reserved} frame, ensuring inaccessible memory is never released
     \item \textbf{Allocation Safety:} \texttt{Reserved} frames are excluded from allocation, maintaining the integrity of inaccessible regions
+    \item \textbf{Configurable Pool Limit:} Added \texttt{Max\_pools} constant (set to 2) to limit the number of frame pools, supporting the typical kernel + process pool configuration
 \end{itemize}
 
 \textbf{Benefits:}
@@ -373,6 +375,7 @@ To prevent accidental release of inaccessible memory blocks, the implementation 
         \item Both internal and external management scenarios
         \item Reserved frames are properly excluded from allocation and release
         \item Inaccessible memory regions are protected from accidental release
+        \item Pool limit enforcement (Max\_pools = 2) prevents excessive pool creation
     \end{itemize}
 \end{itemize}
 
